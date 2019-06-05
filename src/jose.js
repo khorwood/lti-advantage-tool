@@ -2,11 +2,28 @@
 
 const debug = require('debug')('lti-advantage-tool:jwk');
 const jose = require('node-jose');
+const request = require('request-promise-native');
 
 class JOSE {
-    constructor() {
+    constructor(platformConfigs) {
         this._keystore = jose.JWK.createKeyStore();
         this._keystore.generate('RSA', 2048, { alg: 'RS256', use: 'sig' });
+
+        for (let config of platformConfigs) {
+            debug('fetching public keys');
+            var jwks = request.get({
+                uri: config.public_key_uri,
+                json: true
+            })
+                .then((jwks) => {
+                    for (let jwk of jwks.keys) {
+                        debug('adding public key', jwk.kid);
+                        this._keystore.add(jwk, 'json');
+                    }
+                }, (e) => {
+                    debug('unable to fetch JWKS', e);
+                });
+        }
     }
 
     /**
@@ -34,6 +51,15 @@ class JOSE {
         return await jose.JWS.createSign(opts, key)
             .update(payload)
             .final();
+    }
+
+    async validate(token) {
+        try {
+            return await jose.JWS.createVerify(this._keystore)
+                .verify(token);
+        } catch{
+            throw new Error('error validating token');
+        }
     }
 }
 
