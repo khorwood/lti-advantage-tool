@@ -62,3 +62,7 @@ typings/
 
 # config.json
 config.json
+
+# certificates
+server.cert
+server.key
