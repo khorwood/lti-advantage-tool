@@ -59,3 +59,10 @@ typings/
 
 # next.js build output
 .next
+
+# config.json
+config.json
+
+# certificates
+server.cert
+server.key
