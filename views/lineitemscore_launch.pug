@@ -1,0 +1,14 @@
+html
+    body
+        form(action=action method='post' name='myform')
+            fieldset
+                label(for='score_given') Score Given:
+                input(type='number' name='score_given' placeholder='grade')
+                br
+                label(for='score_maximum') Score Maximum:
+                input(type='number' name='score_maximum' placeholder='out of')
+                br
+                label(for='comment') Comment:
+                input(type='text' name='comment' placeholder='comment')
+                br
+                input(type='submit')
