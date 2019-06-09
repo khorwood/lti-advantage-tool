@@ -5,26 +5,27 @@ const jose = require('node-jose');
 const request = require('request-promise-native');
 
 class JOSE {
-    constructor(platformConfigs) {
-        this._platformConfigs = platformConfigs;
-
+    constructor() {
         this._keystore = jose.JWK.createKeyStore();
         this._keystore.generate('RSA', 2048, { alg: 'RS256', use: 'sig' });
-
         this._publicKeys = jose.JWK.createKeyStore();
     }
 
     /**
-     * Handles a web request to get the JWKS store
-     * @param {} req The request
-     * @param {*} res The response
+     * Initializes the JOSE wrapper
+     * @param {object} platformConfigs The plaform configurations
      */
-    async get_jwks(req, res) {
-        debug('get_jwks');
+    init(platformConfigs) {
+        this._platformConfigs = platformConfigs;
+    }
 
-        const response = this._keystore.toJSON();
+    /**
+     * Returns the server's public keys
+     */
+    get_public_keys() {
+        debug('get_public_keys');
 
-        res.send(response);
+        return this._keystore.toJSON();
     }
 
     /**
@@ -62,7 +63,7 @@ class JOSE {
         debug('fetch_platform_keys');
 
         for (let config of this._platformConfigs) {
-            debug('fetching public keys', config.public_key_uri);
+            debug('fetching key set', config.public_key_uri);
             try {
                 let jwks = await request.get({
                     json: true,
@@ -84,4 +85,4 @@ class JOSE {
     }
 }
 
-module.exports = JOSE;
+module.exports = new JOSE();
