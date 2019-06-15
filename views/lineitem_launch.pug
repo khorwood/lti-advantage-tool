@@ -1,0 +1,17 @@
+html
+    body
+        form(action=action method='post' name='myform')
+            fieldset
+                label(for='max_score') Max Score:
+                input(type='number' name='max_score' placeholder='grade')
+                br
+                label(for='label') Label:
+                input(type='text' name='label' placeholder='label')
+                br
+                label(for='tag') Tag:
+                input(type='text' name='tag' placeholder='tag')
+                br
+                label(for='resource_id') Resource Id:
+                input(type='text' name='resource_id' value='lineitem_link')
+                br
+                input(type='submit')
