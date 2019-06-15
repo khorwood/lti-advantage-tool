@@ -1,5 +1,7 @@
 # lti-advantage-tool
 
+[![CircleCI](https://circleci.com/gh/khorwood/lti-advantage-tool.svg?style=svg)](https://circleci.com/gh/khorwood/lti-advantage-tool)
+
 A test harness which implements an IMS LTI Advantage tool
 
 ## Initial setup
@@ -19,9 +21,10 @@ Create a config.json file with the following details.
 {
     "platform_configs": [
         {
-            "client_id": "<client id>",
+            "client_id": "<auth service issued client id>",
+            "deployment_id": "<platform issued deployment id>",
             "audience": "<auth service required audience>",
-            "issuer": "<platform issuer value>",
+            "issuer": "<platform issuer>",
             "authenticate_uri": "<platform authenticate uri>",
             "public_key_uri": "<platform public key uri>",
             "token_uri": "<auth service token uri>"
