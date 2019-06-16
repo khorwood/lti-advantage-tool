@@ -1,6 +1,6 @@
 'use strict';
 
-const debug = require('debug')('lti-advantage-tool:controllers:wellknown')
+const debug = require('debug')('lti-advantage-tool:controllers:wellknown');
 
 const jose = require('../jose');
 

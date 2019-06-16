@@ -13,7 +13,7 @@ class AGS {
             LineItemReadOnly: 'https://purl.imsglobal.org/spec/lti-ags/scope/lineitem.readonly',
             Result: 'https://purl.imsglobal.org/spec/lti-ags/scope/result.readonly',
             Score: 'https://purl.imsglobal.org/spec/lti-ags/scope/score'
-        }
+        };
     }
 }
 
@@ -45,7 +45,7 @@ class LTI {
             Member: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Member',
             Mentor: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Mentor',
             Officer: 'http://purl.imsglobal.org/vocab/lis/v2/membership#Officer'
-        }
+        };
     }
 
     static get InstitutionRoles() {
@@ -84,13 +84,13 @@ class OAuth2 {
     static get AssertionTypes() {
         return {
             JwtBearer: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
-        }
+        };
     }
     
     static get GrantTypes() {
         return {
             ClientCredentials: 'client_credentials'
-        }
+        };
     }
 }
 

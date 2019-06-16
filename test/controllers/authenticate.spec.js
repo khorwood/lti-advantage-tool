@@ -17,7 +17,7 @@ describe('controllers:authenticate', () => {
                     send: (msg) => {
                         expect(msg).to.equal(message);
                     }
-                }
+                };
             }
         };
     };

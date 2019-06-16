@@ -2,6 +2,7 @@
 
 const port = 3000;
 
+const debug = require('debug')('lti-advantage-tool');
 const express = require('express');
 const express_session = require('express-session');
 const fs = require('fs');
@@ -42,5 +43,5 @@ https.createServer({
     cert: fs.readFileSync('server.cert')
 }, app)
     .listen(port, () => {
-        console.log(`Listening: ${port}`)
+        debug(`Listening: ${port}`);
     });

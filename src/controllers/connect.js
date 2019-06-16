@@ -1,6 +1,6 @@
 'use strict';
 
-const debug = require('debug')('lti-advantage-tool:controllers:connect')
+const debug = require('debug')('lti-advantage-tool:controllers:connect');
 const uuid = require('uuid');
 
 module.exports.connect = async (req, res) => {

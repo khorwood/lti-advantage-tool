@@ -1,5 +1,6 @@
 'use strict';
 
+const debug = require('debug')('lti-advantage-tool:utility');
 const request = require('request-promise-native');
 const uuid = require('uuid');
 
@@ -14,6 +15,7 @@ const get_token = async (req) => {
     const client = req.app.get('config').platform_configs.find(
         t => t.client_id === req.session.client_id
     );
+
     const client_assertion = {
         iss: client.client_id,
         sub: client.client_id,
@@ -21,7 +23,8 @@ const get_token = async (req) => {
         iat: epoch(),
         exp: epoch() + 100000,
         jti: uuid()
-    }
+    };
+    
     const signed_assertion = await jose.sign(JSON.stringify(client_assertion));
 
     const assertion = {
@@ -29,7 +32,7 @@ const get_token = async (req) => {
         client_assertion_type: Constants.OAuth2.AssertionTypes.JwtBearer,
         client_assertion: signed_assertion,
         scope: `${Constants.AGS.Scopes.LineItem} ${Constants.AGS.Scopes.Result} ${Constants.AGS.Scopes.Score}`
-    }
+    };
 
     debug(assertion);
 
@@ -49,4 +52,4 @@ const get_token = async (req) => {
 module.exports = {
     epoch,
     get_token
-}
+};

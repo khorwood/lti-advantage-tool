@@ -16,7 +16,7 @@ const authenticate = async (req, res) => {
         const epoch = Math.floor(new Date() / 1000);
         const token = await jose.validate(req.body.id_token);
 
-        if (token.header.alg != 'RS256') { throw new Error('token alg is not RS256') }
+        if (token.header.alg != 'RS256') { throw new Error('token alg is not RS256'); }
 
         let payload = JSON.parse(token.payload.toString('utf8'));
 

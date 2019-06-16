@@ -17,8 +17,8 @@ describe('controllers:wellknown', () => {
             send: (jwks) => {
                 expect(jwks).to.deep.equal({ keys: [] });
             }
-        }
+        };
 
         await wellknown.jwks(req, res);
-    })
+    });
 });

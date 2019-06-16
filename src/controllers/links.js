@@ -123,7 +123,7 @@ const lineitemscore_form = async (req, res) => {
             timestamp: new Date().toISOString(),
             activityProgress: 'Completed',
             gradingProgress: 'FullyGraded'
-        }
+        };
 
         const endpoint_claim = req.session.launch_token[Constants.AGS.Claims.Endpoint];
         if (!endpoint_claim) { throw new Error('missing lti-ags endpoint claim'); }
@@ -144,7 +144,7 @@ const lineitemscore_form = async (req, res) => {
         let line_item = line_items[0];
 
         if (line_item) {
-            let response = await request.post(
+            await request.post(
                 `${line_item.id}/scores`,
                 {
                     body: payload,
@@ -152,14 +152,14 @@ const lineitemscore_form = async (req, res) => {
                     json: true
                 });
 
-            response = await request.get({
+            let result = await request.get({
                 uri: `${line_item.id}/results`,
                 headers: { authorization: `Bearer ${access_token}` },
                 json: true
             });
 
-            response = await request.get({
-                uri: `${response.results[0].id}`,
+            await request.get({
+                uri: `${result.results[0].id}`,
                 headers: { authorization: `Bearer ${access_token}` },
                 json: true
             });
