@@ -66,3 +66,6 @@ config.json
 # certificates
 server.cert
 server.key
+
+# test-results
+test-results/

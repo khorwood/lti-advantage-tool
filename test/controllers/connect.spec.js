@@ -16,7 +16,7 @@ describe('controllers:connect', () => {
                     send: (msg) => {
                         expect(msg).to.equal(message);
                     }
-                }
+                };
             }
         };
     };
@@ -78,12 +78,12 @@ describe('controllers:connect', () => {
                 expect(options.data.redirect_uri).to.equal('https://host/authenticate');
                 expect(options.data.login_hint).to.equal('hint');
                 expect(options.data.response_mode).to.equal('form_post');
-                expect(options.data.lti_message_hint).to.equal('msg_hint')
+                expect(options.data.lti_message_hint).to.equal('msg_hint');
                 expect(options.data.state).to.equal(req.session.csrf);
                 expect(options.data.nonce).to.equal(req.session.nonce);
                 expect(options.data.prompt).to.equal('none');
             }
-        }
+        };
 
         await controller.connect(req, res);
     });

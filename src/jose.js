@@ -71,7 +71,7 @@ class JOSE {
                     uri: config.public_key_uri
                 });
                 for (let jwk of jwks.keys) {
-                    let key = this._publicKeys.get(jwk.kid)
+                    let key = this._publicKeys.get(jwk.kid);
                     if (!key) {
                         debug('adding key', jwk.kid);
                         await this._publicKeys.add(jwk, 'json');

@@ -6,7 +6,6 @@ const { expect } = require('chai');
 
 const links = require('../../src/controllers/links');
 const Constants = require('../../src/constants');
-const jose = require('../../src/jose');
 const utility = require('../../src/utility');
 
 describe('controllers:links', () => {
@@ -43,7 +42,7 @@ describe('controllers:links', () => {
                     send: (msg) => {
                         expect(msg).to.equal(message);
                     }
-                }
+                };
             }
         };
     };
@@ -52,7 +51,7 @@ describe('controllers:links', () => {
         return {
             render: (v, o) => {
                 expect(v).to.equal(view);
-                expect(o).to.deep.equal(options)
+                expect(o).to.deep.equal(options);
             }
         };
     };

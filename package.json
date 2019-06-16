@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "nodemon src/app.js",
-    "test": "mocha test/**/*.spec.js"
+    "lint": "eslint src/**/*.js test/**/*.js",
+    "mocha": "mocha test/**/*.spec.js --reporter mocha-junit-reporter --reporter-options mochaFile=./test-results/mocha/results.xml",
+    "test": "npm run lint && npm run mocha"
   },
   "repository": {
     "type": "git",
@@ -29,7 +31,9 @@
   },
   "devDependencies": {
     "chai": "^4.2.0",
+    "eslint": "^5.16.0",
     "mocha": "^6.1.4",
+    "mocha-junit-reporter": "^1.23.0",
     "nock": "^10.0.6",
     "nodemon": "^1.19.1",
     "sinon": "^7.3.2"
