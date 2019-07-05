@@ -11,7 +11,10 @@ const utility = require('../../src/utility');
 describe('controllers:links', () => {
     before(() => nock.disableNetConnect());
     after(() => nock.enableNetConnect());
-    afterEach(() => sinon.restore());
+    afterEach(() => {
+        nock.cleanAll();
+        sinon.restore();
+    });
 
     const build_req = () => {
         return {
@@ -28,7 +31,11 @@ describe('controllers:links', () => {
                 client_id: 'cid',
                 launch_token: {
                     [Constants.LTI.Claims.ResourceLink]: { id: 'link_id' },
-                    [Constants.AGS.Claims.Endpoint]: { lineitems: 'https://lineitems.com/lineitems' }
+                    [Constants.AGS.Claims.Endpoint]: { lineitems: 'https://lineitems.com/lineitems' },
+                    [Constants.NRPS.Claims.Endpoint]: {
+                        context_memberships_url: 'https://memberships.com/memberships',
+                        service_versions: ['2.0']
+                    }
                 }
             }
         };
@@ -393,5 +400,114 @@ describe('controllers:links', () => {
         let res = build_render('lineitemscore_launch.pug', { action: 'lineitemscore_form' });
 
         await links.lineitemscore_link(req, res);
+    });
+
+    it('nrps_link: returns error with no session', async () => {
+        let req = { session: {} };
+        let res = build_error(401, 'session not found');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error with no endpoint claim', async () => {
+        let req = {
+            session: {
+                client_id: 'cid',
+                launch_token: {}
+            }
+        };
+        let res = build_error(400, 'missing lti-nrps endpoint claim');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error with no context_memberships_url', async () => {
+        let req = {
+            session: {
+                client_id: 'cid',
+                launch_token: {
+                    [Constants.NRPS.Claims.Endpoint]: {}
+                }
+            }
+        };
+        let res = build_error(400, 'missing context_memberships_url');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error with invalid service_versions', async () => {
+        let req = {
+            session: {
+                client_id: 'cid',
+                launch_token: {
+                    [Constants.NRPS.Claims.Endpoint]: {
+                        context_memberships_url: 'https://memberships.com/memberships'
+                    }
+                }
+            }
+        };
+        let res = build_error(400, 'platform does not declare support for service_versions 2.0');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error with missing resource link', async () => {
+        let req = {
+            session: {
+                client_id: 'cid',
+                launch_token: {
+                    [Constants.NRPS.Claims.Endpoint]: {
+                        context_memberships_url: 'https://memberships.com/memberships',
+                        service_versions: ['2.0']
+                    }
+                }
+            }
+        };
+        let res = build_error(400, 'missing lti resource link claim');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error if failed to fetch access token', async () => {
+        sinon.stub(utility, 'get_token').rejects(new Error('failure fetching token'));
+
+        let req = build_req();
+        let res = build_error(400, 'failure fetching token');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error if failed to get memberships', async () => {
+        sinon.stub(utility, 'get_token').returns('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(404, {});
+
+        let req = build_req();
+        let res = build_error(400, '404 - {}');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: renders with session', async () => {
+        sinon.stub(utility, 'get_token').returns('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(200, {
+                id: 'https://memberships.com/memberships?rlid=link_id'
+            });
+
+        let req = build_req();
+        let res = {
+            send: (d) => {
+                expect(d).to.deep.equal({ id: 'https://memberships.com/memberships?rlid=link_id' });
+            }
+        };
+
+        await links.nrps_link(req, res);
     });
 });

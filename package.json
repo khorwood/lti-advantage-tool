@@ -4,7 +4,7 @@
   "description": "A test harness which implements an IMS LTI Advantage tool",
   "main": "src/index.js",
   "scripts": {
-    "start": "nodemon src/app.js",
+    "start": "DEBUG=lti* nodemon src/app.js",
     "lint": "eslint src/**/*.js test/**/*.js",
     "mocha": "mocha test/**/*.spec.js --reporter mocha-junit-reporter --reporter-options mochaFile=./test-results/mocha/results.xml",
     "test": "npm run lint && npm run mocha"

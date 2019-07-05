@@ -171,10 +171,52 @@ const lineitemscore_form = async (req, res) => {
     }
 };
 
+const nrps_link = async (req, res) => {
+    debug('nrps_link');
+
+    try {
+        if (!req.session.client_id) { return res.status(401).send('session not found'); }
+
+        const endpoint_claim = req.session.launch_token[Constants.NRPS.Claims.Endpoint];
+        if (!endpoint_claim) { throw new Error('missing lti-nrps endpoint claim'); }
+
+        const nrps_endpoint = endpoint_claim.context_memberships_url;
+        if (!nrps_endpoint) { throw new Error('missing context_memberships_url'); }
+
+        const nrps_versions = endpoint_claim.service_versions;
+        if (!nrps_versions || !nrps_versions.includes('2.0')) {
+            throw new Error('platform does not declare support for service_versions 2.0');
+        }
+
+        const resource_link_claim = req.session.launch_token[Constants.LTI.Claims.ResourceLink];
+        if (!resource_link_claim) { throw new Error('missing lti resource link claim'); }
+
+        const resource_link_id = resource_link_claim.id;
+
+        const access_token = await utility.get_token(req);
+
+        const memberships = await request.get({
+            uri: nrps_endpoint,
+            qs: {
+                rlid: resource_link_id
+            },
+            headers: { authorization: `Bearer ${access_token}` },
+            json: true
+        });
+
+        debug(memberships);
+
+        res.send(memberships);
+    } catch (e) {
+        return res.status(400).send(e.message);
+    }
+};
+
 module.exports = {
     simple_link,
     lineitem_form,
     lineitem_link,
     lineitemscore_link,
-    lineitemscore_form
+    lineitemscore_form,
+    nrps_link
 };

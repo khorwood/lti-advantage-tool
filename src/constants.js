@@ -80,6 +80,14 @@ class LTI {
     }
 }
 
+class NRPS {
+    static get Claims() {
+        return {
+            Endpoint: "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice"
+        };
+    }
+}
+
 class OAuth2 {
     static get AssertionTypes() {
         return {
@@ -97,5 +105,6 @@ class OAuth2 {
 module.exports = {
     AGS,
     LTI,
+    NRPS,
     OAuth2
 };
