@@ -9,7 +9,10 @@ const utility = require('../utility');
 const simple_link = async (req, res) => {
     debug('simple_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+    const launch_token = req.session && req.session.launch_token;
+    if (!launch_token) {
+        return res.status(401).send('session not found');
+    }
 
     res.render('simple_launch.pug');
 };
@@ -17,7 +20,10 @@ const simple_link = async (req, res) => {
 const lineitem_link = async (req, res) => {
     debug('lineitem_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+    const launch_token = req.session && req.session.launch_token;
+    if (!launch_token) {
+        return res.status(401).send('session not found');
+    }
 
     res.render('lineitem_launch.pug', { action: 'lineitem_form' });
 };
@@ -25,7 +31,10 @@ const lineitem_link = async (req, res) => {
 const lineitemscore_link = async (req, res) => {
     debug('lineitemscore_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+    const launch_token = req.session && req.session.launch_token;
+    if (!launch_token) {
+        return res.status(401).send('session not found');
+    }
 
     res.render('lineitemscore_launch.pug', { action: 'lineitemscore_form' });
 };
@@ -34,9 +43,12 @@ const lineitem_form = async (req, res) => {
     debug('lineitem_form');
 
     try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
+        const launch_token = req.session && req.session.launch_token;
+        if (!launch_token) {
+            return res.status(401).send('session not found');
+        }
 
-        const resource_link_claim = req.session.launch_token[Constants.LTI.Claims.ResourceLink];
+        const resource_link_claim = launch_token[Constants.LTI.Claims.ResourceLink];
         if (!resource_link_claim) { throw new Error('missing lti-ags resource link claim'); }
 
         const resource_link_id = resource_link_claim.id;
@@ -62,37 +74,33 @@ const lineitem_form = async (req, res) => {
         if (!endpoint_claim) { throw new Error('missing lti-ags endpoint claim'); }
 
         const lineitems_endpoint = endpoint_claim.lineitems;
+        if (!lineitems_endpoint) { throw new Error('missing endpoint lineitems'); }
 
         const access_token = await utility.get_token(req);
 
         let lineitems = await request.get({
             uri: lineitems_endpoint,
             headers: { authorization: `Bearer ${access_token}` },
-            qs: {
-                resource_id: req.body.resource_id
-            },
+            qs: { resource_id: req.body.resource_id },
             json: true
         });
 
         if (!lineitems.length) {
-            let response = await request.post(
-                lineitems_endpoint,
-                {
-                    uri: lineitems_endpoint,
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
-                });
+            let response = await request.post({
+                uri: lineitems_endpoint,
+                body: payload,
+                headers: { authorization: `Bearer ${access_token}` },
+                json: true
+            });
 
             debug(response);
         } else {
-            let response = await request.put(
-                `${lineitems[0].id}`,
-                {
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
-                });
+            let response = await request.put({
+                uri: `${lineitems[0].id}`,
+                body: payload,
+                headers: { authorization: `Bearer ${access_token}` },
+                json: true
+            });
 
             debug(response);
         }
@@ -107,16 +115,17 @@ const lineitemscore_form = async (req, res) => {
     debug('lineitemscore_form');
 
     try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
-
-        const sub = req.session.launch_token['sub'];
+        const launch_token = req.session && req.session.launch_token;
+        if (!launch_token) {
+            return res.status(401).send('session not found');
+        }
 
         if (!req.body.score_given) { throw new Error('missing score_given'); }
         if (!req.body.score_maximum) { throw new Error('missing score_maximum'); }
         if (!req.body.comment) { throw new Error('missing comment'); }
 
-        let payload = {
-            userId: sub,
+        const payload = {
+            userId: launch_token['sub'],
             scoreGiven: req.body.score_given,
             scoreMaximum: req.body.score_maximum,
             comment: req.body.comment,
@@ -125,38 +134,40 @@ const lineitemscore_form = async (req, res) => {
             gradingProgress: 'FullyGraded'
         };
 
-        const endpoint_claim = req.session.launch_token[Constants.AGS.Claims.Endpoint];
+        const endpoint_claim = launch_token[Constants.AGS.Claims.Endpoint];
         if (!endpoint_claim) { throw new Error('missing lti-ags endpoint claim'); }
 
         const lineitems_endpoint = endpoint_claim.lineitems;
+        if (!lineitems_endpoint) { throw new Error('missing endpoint lineitems'); }
 
         const access_token = await utility.get_token(req);
 
-        let line_items = await request.get({
+        const line_items = await request.get({
             uri: lineitems_endpoint,
-            qs: {
-                resource_id: req.body.resource_id
-            },
+            qs: { resource_id: req.body.resource_id },
             headers: { authorization: `Bearer ${access_token}` },
             json: true
         });
 
-        let line_item = line_items[0];
+        debug(line_items);
+
+        const line_item = line_items[0];
 
         if (line_item) {
-            await request.post(
-                `${line_item.id}/scores`,
-                {
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
-                });
+            await request.post({
+                uri: `${line_item.id}/scores`,
+                body: payload,
+                headers: { authorization: `Bearer ${access_token}` },
+                json: true
+            });
 
             let result = await request.get({
                 uri: `${line_item.id}/results`,
                 headers: { authorization: `Bearer ${access_token}` },
                 json: true
             });
+
+            debug(result);
 
             await request.get({
                 uri: `${result.results[0].id}`,
@@ -171,13 +182,26 @@ const lineitemscore_form = async (req, res) => {
     }
 };
 
+const nrps_validate_membership = (membership) => {
+    if (!membership.context || !membership.context.id) { throw new Error('missing membership context id'); }
+    if (!membership.members) { throw new Error('missing members'); }
+
+    membership.members.map(m => {
+        if (!m.user_id) { throw new Error('missing member user_id'); }
+        if (!m.roles) { throw new Error('missing member roles'); }
+    });
+};
+
 const nrps_link = async (req, res) => {
     debug('nrps_link');
 
     try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
+        const launch_token = req.session && req.session.launch_token;
+        if (!launch_token) {
+            return res.status(401).send('session not found');
+        }
 
-        const endpoint_claim = req.session.launch_token[Constants.NRPS.Claims.Endpoint];
+        const endpoint_claim = launch_token[Constants.NRPS.Claims.Endpoint];
         if (!endpoint_claim) { throw new Error('missing lti-nrps endpoint claim'); }
 
         const nrps_endpoint = endpoint_claim.context_memberships_url;
@@ -188,25 +212,26 @@ const nrps_link = async (req, res) => {
             throw new Error('platform does not declare support for service_versions 2.0');
         }
 
-        const resource_link_claim = req.session.launch_token[Constants.LTI.Claims.ResourceLink];
+        const resource_link_claim = launch_token[Constants.LTI.Claims.ResourceLink];
         if (!resource_link_claim) { throw new Error('missing lti resource link claim'); }
 
         const resource_link_id = resource_link_claim.id;
+        if (!resource_link_id) { throw new Error('missing resource_link id'); }
 
         const access_token = await utility.get_token(req);
 
-        const memberships = await request.get({
+        const membership = await request.get({
             uri: nrps_endpoint,
-            qs: {
-                rlid: resource_link_id
-            },
+            qs: { rlid: resource_link_id },
             headers: { authorization: `Bearer ${access_token}` },
             json: true
         });
 
-        debug(memberships);
+        debug(membership);
 
-        res.send(memberships);
+        nrps_validate_membership(membership);
+
+        res.send(membership);
     } catch (e) {
         return res.status(400).send(e.message);
     }
