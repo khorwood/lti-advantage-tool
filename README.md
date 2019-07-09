@@ -32,3 +32,12 @@ Create a config.json file with the following details.
     ]
 }
 ```
+
+## Links
+
+| Link | Description |
+| -- | -- |
+| `/links/simple` | A link to test launches |
+| `/links/lineitem` | A link which allows creation of line items |
+| `/links/lineitemscore` | A link which allows creation of line item scores |
+| `/links/nrpslink` | A link which fetches the roster |
