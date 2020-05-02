@@ -6,7 +6,7 @@
   "scripts": {
     "start": "DEBUG=lti* nodemon src/app.js",
     "lint": "eslint src/**/*.js test/**/*.js",
-    "mocha": "mocha test/**/*.spec.js --reporter mocha-junit-reporter --reporter-options mochaFile=./test-results/mocha/results.xml",
+    "mocha": "mocha test/**/*.spec.js",
     "test": "npm run lint && npm run mocha"
   },
   "repository": {

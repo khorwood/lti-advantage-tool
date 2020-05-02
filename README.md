@@ -1,6 +1,6 @@
 # lti-advantage-tool
 
-[![CircleCI](https://circleci.com/gh/khorwood/lti-advantage-tool.svg?style=svg)](https://circleci.com/gh/khorwood/lti-advantage-tool)
+![Node.js](https://github.com/khorwood/lti-advantage-tool/workflows/Node.js/badge.svg)
 
 A test harness which implements an IMS LTI Advantage tool
 
