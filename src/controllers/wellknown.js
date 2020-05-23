@@ -1,17 +1,18 @@
 'use strict';
 
-const debug = require('debug')('lti-advantage-tool:controllers:wellknown');
+class WellknownController {
+    constructor(jose) {
+        this._debug = require('debug')('lti-advantage-tool:controllers:wellknown');
+        this._jose = jose;
+    }
 
-const jose = require('../jose');
+    jwks(_, response) {
+        this._debug('jwks');
 
-const jwks = async (_, res) => {
-    debug('jwks');
+        const jwks = this._jose.getPublicKeys();
 
-    const jwks = jose.get_public_keys();
+        response.send(jwks);
+    }
+}
 
-    res.send(jwks);
-};
-
-module.exports = {
-    jwks
-};
+module.exports = WellknownController;

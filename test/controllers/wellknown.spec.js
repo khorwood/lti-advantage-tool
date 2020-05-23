@@ -1,24 +1,27 @@
 'use strict';
 
-const { expect } = require('chai');
+const test = require('ava');
 const sinon = require('sinon');
 
-const jose = require('../../src/jose');
-const wellknown = require('../../src/controllers/wellknown');
+const WellknownController = require('../../src/controllers/wellknown');
 
-describe('controllers:wellknown', () => {
-    afterEach(() => sinon.restore());
+const mockRequest = request => {
+    return request;
+};
 
-    it('jwks: returns public keyset', async () => {
-        sinon.stub(jose, 'get_public_keys').returns({ keys: [] });
+const mockResponse = () => {
+    const response = {};
+    response.send = sinon.stub().returns(response);
+    return response;
+};
 
-        let req = {};
-        let res = {
-            send: (jwks) => {
-                expect(jwks).to.deep.equal({ keys: [] });
-            }
-        };
+test('jwks returns public keyset', async t => {
+    const request = mockRequest();
+    const response = mockResponse();
+    const payload = { keys: [] };
 
-        await wellknown.jwks(req, res);
-    });
+    const controller = new WellknownController({ getPublicKeys: () => payload });
+    await controller.jwks(request, response);
+
+    t.is(payload, response.send.getCall(0).args[0]);
 });

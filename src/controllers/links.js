@@ -1,222 +1,277 @@
 'use strict';
 
-const debug = require('debug')('lti-advantage-tool:controllers:links');
-const request = require('request-promise-native');
+const constants = require('../constants');
 
-const Constants = require('../constants');
-const utility = require('../utility');
+class LinksController {
+    constructor(utility) {
+        this._debug = require('debug')('lti-advantage-tool:controllers:links');
+        this._utility = utility;
+    }
 
-const simple_link = async (req, res) => {
-    debug('simple_link');
+    simpleLink(request, response) {
+        this._debug('simple_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+        if (!request.session.client_id) {
+            return response.status(401).send('session not found');
+        }
 
-    res.render('simple_launch.pug');
-};
+        response.render('simple_launch.pug');
+    }
 
-const lineitem_link = async (req, res) => {
-    debug('lineitem_link');
+    lineItemLink(request, response) {
+        this._debug('lineitem_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+        if (!request.session.client_id) {
+            return response.status(401).send('session not found');
+        }
 
-    res.render('lineitem_launch.pug', { action: 'lineitem_form' });
-};
+        response.render('lineitem_launch.pug', { action: 'lineitem_form' });
+    }
 
-const lineitemscore_link = async (req, res) => {
-    debug('lineitemscore_link');
+    lineItemScoreLink(request, response) {
+        this._debug('lineitemscore_link');
 
-    if (!req.session.client_id) { return res.status(401).send('session not found'); }
+        if (!request.session.client_id) {
+            return response.status(401).send('session not found');
+        }
 
-    res.render('lineitemscore_launch.pug', { action: 'lineitemscore_form' });
-};
+        response.render('lineitemscore_launch.pug', { action: 'lineitemscore_form' });
+    }
 
-const lineitem_form = async (req, res) => {
-    debug('lineitem_form');
+    async lineItemForm(request, response) {
+        this._debug('lineitem_form');
 
-    try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
-
-        const resource_link_claim = req.session.launch_token[Constants.LTI.Claims.ResourceLink];
-        if (!resource_link_claim) { throw new Error('missing lti-ags resource link claim'); }
-
-        const resource_link_id = resource_link_claim.id;
-
-        if (!req.body.max_score) { throw new Error('missing max_score'); }
-        if (!req.body.label) { throw new Error('missing label'); }
-        if (!req.body.tag) { throw new Error('missing tag'); }
-        if (!req.body.resource_id) { throw new Error('missing resource_id'); }
-
-        var payload = {
-            scoreMaximum: req.body.max_score,
-            label: req.body.label,
-            tag: req.body.tag,
-            resourceId: req.body.resource_id,
-            resourceLinkId: resource_link_id,
-            submission: {
-                startDateTime: new Date().toISOString(),
-                endDateTime: new Date().toISOString()
+        try {
+            if (!request.session.client_id) {
+                return response.status(401).send('session not found');
             }
-        };
 
-        const endpoint_claim = req.session.launch_token[Constants.AGS.Claims.Endpoint];
-        if (!endpoint_claim) { throw new Error('missing lti-ags endpoint claim'); }
+            const resourceLinkClaim = request.session.launch_token[constants.LTI.Claims.ResourceLink];
+            if (!resourceLinkClaim) {
+                throw new Error('missing lti-ags resource link claim');
+            }
 
-        const lineitems_endpoint = endpoint_claim.lineitems;
+            const resourceLinkId = resourceLinkClaim.id;
 
-        const access_token = await utility.get_token(req);
+            if (!request.body.max_score) {
+                throw new Error('missing max_score');
+            }
 
-        let lineitems = await request.get({
-            uri: lineitems_endpoint,
-            headers: { authorization: `Bearer ${access_token}` },
-            qs: {
-                resource_id: req.body.resource_id
-            },
-            json: true
-        });
+            if (!request.body.label) {
+                throw new Error('missing label');
+            }
 
-        if (!lineitems.length) {
-            let response = await request.post(
-                lineitems_endpoint,
+            if (!request.body.tag) {
+                throw new Error('missing tag');
+            }
+
+            if (!request.body.resource_id) {
+                throw new Error('missing resource_id');
+            }
+
+            const payload = {
+                scoreMaximum: request.body.max_score,
+                label: request.body.label,
+                tag: request.body.tag,
+                resourceId: request.body.resource_id,
+                resourceLinkId,
+                submission: {
+                    startDateTime: new Date().toISOString(),
+                    endDateTime: new Date().toISOString()
+                }
+            };
+
+            const endpointClaim = request.session.launch_token[constants.AGS.Claims.Endpoint];
+            if (!endpointClaim) {
+                throw new Error('missing lti-ags endpoint claim');
+            }
+
+            const lineItemsEndpoint = endpointClaim.lineitems;
+
+            const accessToken = await this._utility.getToken(request);
+
+            const lineitems = await this._utility.fetch(
+                lineItemsEndpoint,
                 {
-                    uri: lineitems_endpoint,
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
+                    headers: {
+                        authorization: `Bearer ${accessToken}`
+                    }
+                },
+                {
+                    resource_id: request.body.resource_id
+                });
+            if (lineitems.length === 0) {
+                const lineitem = await this._utility.fetch(
+                    lineItemsEndpoint,
+                    {
+                        method: 'post',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                this._debug(lineitem);
+            } else {
+                const lineitem = await this._utility.fetch(
+                    `${lineitems[0].id}`,
+                    {
+                        method: 'put',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                this._debug(lineitem);
+            }
+
+            response.render('simple_launch.pug');
+        } catch (error) {
+            return response.status(400).send(error.message);
+        }
+    }
+
+    async lineItemScoreForm(request, response) {
+        this._debug('lineitemscore_form');
+
+        try {
+            if (!request.session.client_id) {
+                return response.status(401).send('session not found');
+            }
+
+            const sub = request.session.launch_token.sub;
+
+            if (!request.body.score_given) {
+                throw new Error('missing score_given');
+            }
+
+            if (!request.body.score_maximum) {
+                throw new Error('missing score_maximum');
+            }
+
+            if (!request.body.comment) {
+                throw new Error('missing comment');
+            }
+
+            const payload = {
+                userId: sub,
+                scoreGiven: request.body.score_given,
+                scoreMaximum: request.body.score_maximum,
+                comment: request.body.comment,
+                timestamp: new Date().toISOString(),
+                activityProgress: 'Completed',
+                gradingProgress: 'FullyGraded'
+            };
+
+            const endpointClaim = request.session.launch_token[constants.AGS.Claims.Endpoint];
+            if (!endpointClaim) {
+                throw new Error('missing lti-ags endpoint claim');
+            }
+
+            const lineitemsEndpoint = endpointClaim.lineitems;
+
+            const accessToken = await this._utility.getToken(request);
+
+            const lineItems = await this._utility.fetch(
+                lineitemsEndpoint,
+                {
+                    headers: {
+                        authorization: `Bearer ${accessToken}`
+                    }
+                },
+                {
+                    resource_id: request.body.resource_id
                 });
 
-            debug(response);
-        } else {
-            let response = await request.put(
-                `${lineitems[0].id}`,
+            const lineItem = lineItems[0];
+            if (lineItem) {
+                await this._utility.fetch(
+                    `${lineItem.id}/scores`,
+                    {
+                        method: 'post',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                const result = await this._utility.fetch(
+                    `${lineItem.id}/results`,
+                    {
+                        headers: {
+                            authorization: `Bearer ${accessToken}`
+                        }
+                    });
+
+                await this._utility.fetch(
+                    `${result.results[0].id}`,
+                    {
+                        headers: {
+                            authorization: `Bearer ${accessToken}`
+                        }
+                    });
+            }
+
+            response.render('simple_launch.pug');
+        } catch (error) {
+            return response.status(400).send(error.message);
+        }
+    }
+
+    async nrpsLink(request, response) {
+        this._debug('nrps_link');
+
+        try {
+            if (!request.session.client_id) {
+                return response.status(401).send('session not found');
+            }
+
+            const endpointClaim = request.session.launch_token[constants.NRPS.Claims.Endpoint];
+            if (!endpointClaim) {
+                throw new Error('missing lti-nrps endpoint claim');
+            }
+
+            const nrpsEndpoint = endpointClaim.context_memberships_url;
+            if (!nrpsEndpoint) {
+                throw new Error('missing context_memberships_url');
+            }
+
+            const nrpsVersions = endpointClaim.service_versions;
+            if (!nrpsVersions || !nrpsVersions.includes('2.0')) {
+                throw new Error('platform does not declare support for service_versions 2.0');
+            }
+
+            const resourceLinkClaim = request.session.launch_token[constants.LTI.Claims.ResourceLink];
+            if (!resourceLinkClaim) {
+                throw new Error('missing lti resource link claim');
+            }
+
+            const resourceLinkId = resourceLinkClaim.id;
+
+            const accessToken = await this._utility.getToken(request);
+
+            const memberships = await this._utility.fetch(
+                nrpsEndpoint,
                 {
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
+                    headers: {
+                        authorization: `Bearer ${accessToken}`
+                    }
+                },
+                {
+                    rlid: resourceLinkId
                 });
 
-            debug(response);
+            this._debug(memberships);
+
+            response.send(memberships);
+        } catch (error) {
+            return response.status(400).send(error.message);
         }
-
-        res.render('simple_launch.pug');
-    } catch (e) {
-        return res.status(400).send(e.message);
     }
-};
+}
 
-const lineitemscore_form = async (req, res) => {
-    debug('lineitemscore_form');
-
-    try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
-
-        const sub = req.session.launch_token['sub'];
-
-        if (!req.body.score_given) { throw new Error('missing score_given'); }
-        if (!req.body.score_maximum) { throw new Error('missing score_maximum'); }
-        if (!req.body.comment) { throw new Error('missing comment'); }
-
-        let payload = {
-            userId: sub,
-            scoreGiven: req.body.score_given,
-            scoreMaximum: req.body.score_maximum,
-            comment: req.body.comment,
-            timestamp: new Date().toISOString(),
-            activityProgress: 'Completed',
-            gradingProgress: 'FullyGraded'
-        };
-
-        const endpoint_claim = req.session.launch_token[Constants.AGS.Claims.Endpoint];
-        if (!endpoint_claim) { throw new Error('missing lti-ags endpoint claim'); }
-
-        const lineitems_endpoint = endpoint_claim.lineitems;
-
-        const access_token = await utility.get_token(req);
-
-        let line_items = await request.get({
-            uri: lineitems_endpoint,
-            qs: {
-                resource_id: req.body.resource_id
-            },
-            headers: { authorization: `Bearer ${access_token}` },
-            json: true
-        });
-
-        let line_item = line_items[0];
-
-        if (line_item) {
-            await request.post(
-                `${line_item.id}/scores`,
-                {
-                    body: payload,
-                    headers: { authorization: `Bearer ${access_token}` },
-                    json: true
-                });
-
-            let result = await request.get({
-                uri: `${line_item.id}/results`,
-                headers: { authorization: `Bearer ${access_token}` },
-                json: true
-            });
-
-            await request.get({
-                uri: `${result.results[0].id}`,
-                headers: { authorization: `Bearer ${access_token}` },
-                json: true
-            });
-        }
-
-        res.render('simple_launch.pug');
-    } catch (e) {
-        return res.status(400).send(e.message);
-    }
-};
-
-const nrps_link = async (req, res) => {
-    debug('nrps_link');
-
-    try {
-        if (!req.session.client_id) { return res.status(401).send('session not found'); }
-
-        const endpoint_claim = req.session.launch_token[Constants.NRPS.Claims.Endpoint];
-        if (!endpoint_claim) { throw new Error('missing lti-nrps endpoint claim'); }
-
-        const nrps_endpoint = endpoint_claim.context_memberships_url;
-        if (!nrps_endpoint) { throw new Error('missing context_memberships_url'); }
-
-        const nrps_versions = endpoint_claim.service_versions;
-        if (!nrps_versions || !nrps_versions.includes('2.0')) {
-            throw new Error('platform does not declare support for service_versions 2.0');
-        }
-
-        const resource_link_claim = req.session.launch_token[Constants.LTI.Claims.ResourceLink];
-        if (!resource_link_claim) { throw new Error('missing lti resource link claim'); }
-
-        const resource_link_id = resource_link_claim.id;
-
-        const access_token = await utility.get_token(req);
-
-        const memberships = await request.get({
-            uri: nrps_endpoint,
-            qs: {
-                rlid: resource_link_id
-            },
-            headers: { authorization: `Bearer ${access_token}` },
-            json: true
-        });
-
-        debug(memberships);
-
-        res.send(memberships);
-    } catch (e) {
-        return res.status(400).send(e.message);
-    }
-};
-
-module.exports = {
-    simple_link,
-    lineitem_form,
-    lineitem_link,
-    lineitemscore_link,
-    lineitemscore_form,
-    nrps_link
-};
+module.exports = LinksController;

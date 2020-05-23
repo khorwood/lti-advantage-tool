@@ -1,11 +1,14 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const ConnectController = require('../controllers/connect');
 
-const controller = require('../controllers/connect');
+module.exports = uuid => {
+    const controller = new ConnectController(uuid);
 
-router.get('/', controller.connect);
-router.post('/', controller.connect);
+    const router = express.Router();
+    router.get('/', controller.connect);
+    router.post('/', controller.connect);
 
-module.exports = router;
+    return router;
+};

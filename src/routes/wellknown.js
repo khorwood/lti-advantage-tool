@@ -1,10 +1,13 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const WellknownController = require('../controllers/wellknown');
 
-const controller = require('../controllers/wellknown');
+module.exports = jose => {
+    const controller = new WellknownController(jose);
 
-router.get('/jwks.json', controller.jwks);
+    const router = express.Router();
+    router.get('/jwks.json', controller.jwks);
 
-module.exports = router;
+    return router;
+};

@@ -1,15 +1,18 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const LinksController = require('../controllers/links');
 
-const controller = require('../controllers/links');
+module.exports = utility => {
+    const controller = new LinksController(utility);
 
-router.get('/simple', controller.simple_link);
-router.get('/lineitem', controller.lineitem_link);
-router.post('/lineitem_form', controller.lineitem_form);
-router.get('/lineitemscore', controller.lineitemscore_link);
-router.post('/lineitemscore_form', controller.lineitemscore_form);
-router.get('/nrpslink', controller.nrps_link);
+    const router = express.Router();
+    router.get('/simple', controller.simpleLink);
+    router.get('/lineitem', controller.lineItemLink);
+    router.post('/lineitem_form', controller.lineItemForm);
+    router.get('/lineitemscore', controller.lineItemScoreLink);
+    router.post('/lineitemscore_form', controller.lineItemScoreForm);
+    router.get('/nrpslink', controller.nrpsLink);
 
-module.exports = router;
+    return router;
+};

@@ -83,7 +83,7 @@ class LTI {
 class NRPS {
     static get Claims() {
         return {
-            Endpoint: "https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice"
+            Endpoint: 'https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice'
         };
     }
 }
@@ -94,7 +94,7 @@ class OAuth2 {
             JwtBearer: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
         };
     }
-    
+
     static get GrantTypes() {
         return {
             ClientCredentials: 'client_credentials'
