@@ -28,7 +28,6 @@ describe('controllers:links', () => {
                 comment: 'comment'
             },
             session: {
-                client_id: 'cid',
                 launch_token: {
                     [Constants.LTI.Claims.ResourceLink]: { id: 'link_id' },
                     [Constants.AGS.Claims.Endpoint]: { lineitems: 'https://lineitems.com/lineitems' },
@@ -410,12 +409,7 @@ describe('controllers:links', () => {
     });
 
     it('nrps_link: returns error with no endpoint claim', async () => {
-        let req = {
-            session: {
-                client_id: 'cid',
-                launch_token: {}
-            }
-        };
+        let req = { session: { launch_token: {} } };
         let res = build_error(400, 'missing lti-nrps endpoint claim');
 
         await links.nrps_link(req, res);
@@ -424,7 +418,6 @@ describe('controllers:links', () => {
     it('nrps_link: returns error with no context_memberships_url', async () => {
         let req = {
             session: {
-                client_id: 'cid',
                 launch_token: {
                     [Constants.NRPS.Claims.Endpoint]: {}
                 }
@@ -435,10 +428,9 @@ describe('controllers:links', () => {
         await links.nrps_link(req, res);
     });
 
-    it('nrps_link: returns error with invalid service_versions', async () => {
+    it('nrps_link: returns error with no service_versions', async () => {
         let req = {
             session: {
-                client_id: 'cid',
                 launch_token: {
                     [Constants.NRPS.Claims.Endpoint]: {
                         context_memberships_url: 'https://memberships.com/memberships'
@@ -451,10 +443,25 @@ describe('controllers:links', () => {
         await links.nrps_link(req, res);
     });
 
+    it('nrps_link: returns error with invalid service_versions', async () => {
+        let req = {
+            session: {
+                launch_token: {
+                    [Constants.NRPS.Claims.Endpoint]: {
+                        context_memberships_url: 'https://memberships.com/memberships',
+                        service_versions: ['1.0']
+                    }
+                }
+            }
+        };
+        let res = build_error(400, 'platform does not declare support for service_versions 2.0');
+
+        await links.nrps_link(req, res);
+    });
+
     it('nrps_link: returns error with missing resource link', async () => {
         let req = {
             session: {
-                client_id: 'cid',
                 launch_token: {
                     [Constants.NRPS.Claims.Endpoint]: {
                         context_memberships_url: 'https://memberships.com/memberships',
@@ -478,7 +485,7 @@ describe('controllers:links', () => {
     });
 
     it('nrps_link: returns error if failed to get memberships', async () => {
-        sinon.stub(utility, 'get_token').returns('token');
+        sinon.stub(utility, 'get_token').resolves('token');
         nock('https://memberships.com')
             .matchHeader('authorization', 'Bearer token')
             .get('/memberships')
@@ -491,8 +498,8 @@ describe('controllers:links', () => {
         await links.nrps_link(req, res);
     });
 
-    it('nrps_link: renders with session', async () => {
-        sinon.stub(utility, 'get_token').returns('token');
+    it('nrps_link: returns error if membership missing context id', async () => {
+        sinon.stub(utility, 'get_token').resolves('token');
         nock('https://memberships.com')
             .matchHeader('authorization', 'Bearer token')
             .get('/memberships')
@@ -502,9 +509,84 @@ describe('controllers:links', () => {
             });
 
         let req = build_req();
+        let res = build_error(400, 'missing membership context id');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error if missing members', async () => {
+        sinon.stub(utility, 'get_token').resolves('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(200, {
+                id: 'https://memberships.com/memberships?rlid=link_id',
+                context: { id: 'context_id' }
+            });
+
+        let req = build_req();
+        let res = build_error(400, 'missing members');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error if missing member user_id', async () => {
+        sinon.stub(utility, 'get_token').resolves('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(200, {
+                id: 'https://memberships.com/memberships?rlid=link_id',
+                context: { id: 'context_id' },
+                members: [{}]
+            });
+
+        let req = build_req();
+        let res = build_error(400, 'missing member user_id');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: returns error if missing member roles', async () => {
+        sinon.stub(utility, 'get_token').resolves('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(200, {
+                id: 'https://memberships.com/memberships?rlid=link_id',
+                context: { id: 'context_id' },
+                members: [{ user_id: 'user_id' }]
+            });
+
+        let req = build_req();
+        let res = build_error(400, 'missing member roles');
+
+        await links.nrps_link(req, res);
+    });
+
+    it('nrps_link: renders with session', async () => {
+        sinon.stub(utility, 'get_token').resolves('token');
+        nock('https://memberships.com')
+            .matchHeader('authorization', 'Bearer token')
+            .get('/memberships')
+            .query({ rlid: 'link_id' })
+            .reply(200, {
+                id: 'https://memberships.com/memberships?rlid=link_id',
+                context: { id: 'context_id' },
+                members: [{ user_id: 'user_id', roles: ['role'] }]
+            });
+
+        let req = build_req();
         let res = {
             send: (d) => {
-                expect(d).to.deep.equal({ id: 'https://memberships.com/memberships?rlid=link_id' });
+                expect(d).to.deep.equal({
+                    id: 'https://memberships.com/memberships?rlid=link_id',
+                    context: { id: 'context_id' },
+                    members: [{ user_id: 'user_id', roles: ['role'] }]
+                });
             }
         };
 
