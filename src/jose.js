@@ -1,29 +1,29 @@
 'use strict';
 
-const debug = require('debug')('lti-advantage-tool:jose');
-const jose = require('node-jose');
-const request = require('request-promise-native');
-
 class JOSE {
-    constructor() {
-        this._keystore = jose.JWK.createKeyStore();
-        this._keystore.generate('RSA', 2048, { alg: 'RS256', use: 'sig' });
-        this._publicKeys = jose.JWK.createKeyStore();
+    constructor(fetch) {
+        this._debug = require('debug')('lti-advantage-tool:jose');
+        this._fetch = fetch;
+        this._jose = require('node-jose');
+
+        this._keystore = this._jose.JWK.createKeyStore();
+        this._publicKeys = this._jose.JWK.createKeyStore();
     }
 
     /**
      * Initializes the JOSE wrapper
      * @param {object} platformConfigs The plaform configurations
      */
-    init(platformConfigs) {
+    async init(platformConfigs) {
         this._platformConfigs = platformConfigs;
+        await this._keystore.generate('RSA', 2048, { alg: 'RS256', use: 'sig' });
     }
 
     /**
      * Returns the server's public keys
      */
-    get_public_keys() {
-        debug('get_public_keys');
+    getPublicKeys() {
+        this._debug('getPublicKeys');
 
         return this._keystore.toJSON();
     }
@@ -33,13 +33,13 @@ class JOSE {
      * @param {string} payload The payload as a string
      */
     async sign(payload) {
-        debug('sign');
+        this._debug('sign');
 
         const key = this._keystore.all()[0];
 
-        const opts = { compact: true, jwk: key };
+        const options = { compact: true, jwk: key };
 
-        return await jose.JWS.createSign(opts, key)
+        return this._jose.JWS.createSign(options, key)
             .update(payload)
             .final();
     }
@@ -49,40 +49,50 @@ class JOSE {
      * @param {string} token The JWT to validate
      */
     async validate(token) {
-        debug('validate');
+        this._debug('validate');
 
-        await this.fetch_platform_keys();
+        await this.fetchPlatformKeys();
 
-        let result = await jose.JWS.createVerify(this._publicKeys)
+        const result = await this._jose.JWS.createVerify(this._publicKeys)
             .verify(token);
 
         return result;
     }
 
-    async fetch_platform_keys() {
-        debug('fetch_platform_keys');
+    async fetchPlatformKeys() {
+        this._debug('fetchPlatformKeys');
 
-        for (let config of this._platformConfigs) {
-            debug('fetching key set', config.public_key_uri);
+        await Promise.all(this._platformConfigs.map(async config => {
+            this._debug('fetching key set', config.public_key_uri);
             try {
-                let jwks = await request.get({
-                    json: true,
-                    timeout: 500,
-                    uri: config.public_key_uri
-                });
-                for (let jwk of jwks.keys) {
-                    let key = this._publicKeys.get(jwk.kid);
-                    if (!key) {
-                        debug('adding key', jwk.kid);
-                        await this._publicKeys.add(jwk, 'json');
-                    }
+                const response = await this._fetch(
+                    config.public_key_uri,
+                    {
+                        timeout: 500
+                    });
+                if (!response.ok) {
+                    throw new Error(`${response.statusCode} - ${response.statusText}`);
                 }
-            } catch (e) {
-                debug('unable to fetch JWKS', config.public_key_uri);
-                debug(e.message);
+
+                const jwks = await response.json();
+                await Promise.all(jwks.keys.map(async jwk => {
+                    try {
+                        const key = this._publicKeys.get(jwk.kid);
+                        if (!key) {
+                            this._debug('adding key', jwk.kid);
+                            await this._publicKeys.add(jwk, 'json');
+                        }
+                    } catch (error) {
+                        this._debug('error adding key', jwk.kid);
+                        this._debug(error.message);
+                    }
+                }));
+            } catch (error) {
+                this._debug('unable to fetch JWKS', config.public_key_uri);
+                this._debug(error.message);
             }
-        }
+        }));
     }
 }
 
-module.exports = new JOSE();
+module.exports = JOSE;

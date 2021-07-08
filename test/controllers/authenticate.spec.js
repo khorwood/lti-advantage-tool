@@ -1,217 +1,259 @@
 'use strict';
 
-const { expect } = require('chai');
+const test = require('ava');
 const sinon = require('sinon');
 
-const jose = require('../../src/jose');
-const controller = require('../../src/controllers/authenticate');
+const constants = require('../../src/constants');
+const AuthenticateController = require('../../src/controllers/authenticate');
 
-describe('controllers:authenticate', () => {
-    afterEach(() => sinon.restore());
+const future = Math.floor(new Date().getTime() / 1000) + 10000;
 
-    const build_error = (code, message) => {
-        return {
-            status: (c) => {
-                expect(c).to.equal(code);
-                return {
-                    send: (msg) => {
-                        expect(msg).to.equal(message);
-                    }
-                };
-            }
-        };
+const mockRequest = request => {
+    return request;
+};
+
+const mockResponse = () => {
+    const response = {};
+    response.status = sinon.stub().returns(response);
+    response.send = sinon.stub().returns(response);
+    response.redirect = sinon.stub().returns(response);
+    return response;
+};
+
+const mockJose = payload => {
+    return {
+        validate: async () => {
+            return { header: { alg: 'RS256' }, payload: JSON.stringify(payload) };
+        }
     };
+};
 
-    it('returns 400 when id_token missing', async () => {
-        let req = { body: {} };
-        let res = build_error(400, 'missing id_token');
+test('authenticate returns 400 when id_token missing', async t => {
+    const request = mockRequest({ body: {} });
+    const response = mockResponse();
 
-        await controller.authenticate(req, res);
+    const controller = new AuthenticateController({});
+    await controller.authenticate(request, response);
+
+    t.true(response.status.calledWith(400));
+    t.is(response.send.getCall(0).args[0], 'missing id_token');
+});
+
+test('authenticate returns 400 when state missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey' } });
+    const response = mockResponse();
+
+    const controller = new AuthenticateController({});
+    await controller.authenticate(request, response);
+
+    t.true(response.status.calledWith(400));
+    t.is(response.send.getCall(0).args[0], 'missing state');
+});
+
+test('authenticate returns 401 when session missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: {} });
+    const response = mockResponse();
+
+    const controller = new AuthenticateController(mockJose({}));
+    await controller.authenticate(request, response);
+
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('session expired, perform connect again', response.send.getCall(0).args[0]);
+});
+
+test('authenticate returns 401 when id_token invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+
+    const controller = new AuthenticateController({
+        validate: async () => {
+            throw new Error('invalid token');
+        }
     });
+    await controller.authenticate(request, response);
 
-    it('returns 400 when state missing', async () => {
-        let req = { body: { id_token: 'ey' } };
-        let res = build_error(400, 'missing state');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
+test('authenticate returns 401 when id_token alg is not RS256', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+
+    const controller = new AuthenticateController({
+        validate: async () => {
+            return { header: { alg: 'EC256' } };
+        }
     });
+    await controller.authenticate(request, response);
 
-    it('returns 401 when no session', async () => {
-        let req = { body: { id_token: 'ey', state: 'state' }, session: {} };
-        let res = build_error(401, 'session expired, perform connect again');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token alg is not RS256', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token iss claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = {};
 
-    it('returns 401 when id_token is invalid', async () => {
-        sinon.stub(jose, 'validate').rejects(new Error('invalid token'));
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'invalid token');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing iss claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token aud claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss' };
 
-    it('returns 401 when id_token alg is not RS256', async () => {
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'EC256' } });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token alg is not RS256');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing aud claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token sub claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud' };
 
-    it('returns 401 when id_token iss is missing', async () => {
-        let payload = {};
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing iss claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing sub claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token exp claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub' };
 
-    it('returns 401 when id_token aud is missing', async () => {
-        let payload = { iss: 'iss' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing aud claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing exp claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token iat claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1 };
 
-    it('returns 401 when id_token sub is missing', async () => {
-        let payload = { iss: 'iss', aud: 'aud' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing sub claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing iat claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token nonce claim is missing', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1 };
 
-    it('returns 401 when id_token exp is missing', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing exp claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token missing nonce claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token iss claim is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id', issuer: 'issuer' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token iat is missing', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1 };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing iat claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token iss claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token aud claim is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'client_id', issuer: 'iss' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token nonce is missing', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1 };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id' } };
-        let res = build_error(401, 'token missing nonce claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token aud claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token nonce claim is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token iss is invalid', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id', issuer: 'issuer' } };
-        let res = build_error(401, 'invalid token iss claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token nonce claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token state claim is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token aud is invalid', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'client_id', issuer: 'iss' } };
-        let res = build_error(401, 'invalid token aud claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token state claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token is expired', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'st' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token nonce is invalid', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'aud', issuer: 'iss' } };
-        let res = build_error(401, 'invalid token nonce claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('token is expired', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token lti_deployment_id is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'st', lti_deployment_id: 'lti' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce' };
 
-    it('returns 401 when id_token state is invalid', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce' } };
-        let res = build_error(401, 'invalid token state claim');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token lti_deployment_id claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate returns 401 when id_token azp is invalid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'st', lti_deployment_id: 'lti' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce', azp: 'azp', [constants.LTI.Claims.DeploymentId]: 'lti' };
 
-    it('returns 401 when id_token is expired', async () => {
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: 1, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = { body: { id_token: 'ey', state: 'state' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'state' } };
-        let res = build_error(401, 'token is expired');
+    t.is(401, response.status.getCall(0).args[0]);
+    t.is('invalid token azp claim', response.send.getCall(0).args[0]);
+});
 
-        await controller.authenticate(req, res);
-    });
+test('authenticate redirects when token is valid', async t => {
+    const request = mockRequest({ body: { id_token: 'ey', state: 'st' }, session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'st', lti_deployment_id: 'lti', target_link_uri: 'uri' } });
+    const response = mockResponse();
+    const payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce', azp: 'aud', [constants.LTI.Claims.DeploymentId]: 'lti' };
 
-    it('returns 401 when id_token lti_deployment_id is invalid', async () => {
-        let future = Math.floor(new Date().getTime() / 1000) + 10000;
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
+    const controller = new AuthenticateController(mockJose(payload));
+    await controller.authenticate(request, response);
 
-        let req = {
-            body: { id_token: 'ey', state: 'state' },
-            session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'state', lti_deployment_id: 'abc' }
-        };
-        let res = build_error(401, 'invalid token lti_deployment_id claim');
-
-        await controller.authenticate(req, res);
-    });
-
-    it('returns 401 when id_token azp is invalid', async () => {
-        let future = Math.floor(new Date().getTime() / 1000) + 10000;
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce', azp: 'azp' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
-
-        let req = {
-            body: { id_token: 'ey', state: 'state' },
-            session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'state' }
-        };
-        let res = build_error(401, 'invalid token azp claim');
-
-        await controller.authenticate(req, res);
-    });
-
-    it('redirects when id_token valid', async () => {
-        let future = Math.floor(new Date().getTime() / 1000) + 10000;
-        let payload = { iss: 'iss', aud: 'aud', sub: 'sub', exp: future, iat: 1, nonce: 'nonce' };
-        sinon.stub(jose, 'validate').resolves({ header: { alg: 'RS256' }, payload: JSON.stringify(payload) });
-
-        let req = {
-            body: { id_token: 'ey', state: 'state' },
-            session: { client_id: 'aud', issuer: 'iss', nonce: 'nonce', csrf: 'state', target_link_uri: 'uri' }
-        };
-        let res = {
-            redirect: (uri) => expect(uri).to.equal(req.session.target_link_uri)
-        };
-
-        await controller.authenticate(req, res);
-    });
+    t.is('uri', response.redirect.getCall(0).args[0]);
 });

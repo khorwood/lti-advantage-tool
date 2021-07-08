@@ -1,10 +1,13 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const AuthenticateController = require('../controllers/authenticate');
 
-const controller = require('../controllers/authenticate');
+module.exports = jose => {
+    const controller = new AuthenticateController(jose);
 
-router.post('/', controller.authenticate);
+    const router = express.Router();
+    router.post('/', controller.authenticate);
 
-module.exports = router;
+    return router;
+};

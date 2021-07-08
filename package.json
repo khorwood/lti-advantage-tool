@@ -5,9 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "DEBUG=lti* nodemon src/app.js",
-    "lint": "eslint src/**/*.js test/**/*.js",
-    "mocha": "mocha test/**/*.spec.js",
-    "test": "npm run lint && npm run mocha"
+    "test": "ava && xo"
   },
   "repository": {
     "type": "git",
@@ -23,18 +21,25 @@
     "debug": "^4.1.1",
     "express": "^4.17.1",
     "express-session": "^1.16.1",
+    "node-fetch": "^2.6.0",
     "node-jose": "^1.1.3",
     "pug": "^2.0.3",
-    "request": "^2.88.0",
-    "request-promise-native": "^1.0.7",
     "uuid": "^3.3.2"
   },
   "devDependencies": {
-    "chai": "^4.2.0",
-    "eslint": "^7.0.0",
-    "mocha": "^7.1.2",
+    "ava": "^3.8.2",
+    "fetch-mock": "^9.10.0",
     "nock": "^12.0.3",
     "nodemon": "^2.0.3",
-    "sinon": "^7.3.2"
+    "sinon": "^7.3.2",
+    "xo": "^0.30.0"
+  },
+  "xo": {
+    "space": 4,
+    "rules": {
+      "camelcase": "off",
+      "new-cap": "warn",
+      "object-curly-spacing": "off"
+    }
   }
 }
